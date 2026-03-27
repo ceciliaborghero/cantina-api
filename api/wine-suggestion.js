@@ -1,8 +1,4 @@
-const Anthropic = require('@anthropic-ai/sdk');
-
-const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+const https = require('https');
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -41,14 +37,38 @@ Rispondi SOLO con un JSON valido, senza markdown, senza backtick, esattamente co
   "reason": "perche lo consiglio (max 6 parole)"
 }`;
 
-    const message = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 300,
-      messages: [{ role: 'user', content: prompt }],
+    const apiKey = process.env.GEMINI_API_KEY;
+    const geminiBody = JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { maxOutputTokens: 300, temperature: 0.7 }
     });
 
-    const text = message.content[0].text.trim();
-    const data = JSON.parse(text);
+    const result = await new Promise((resolve, reject) => {
+      const options = {
+        hostname: 'generativelanguage.googleapis.com',
+        path: `/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(geminiBody)
+        }
+      };
+
+      const req2 = https.request(options, (resp) => {
+        let data = '';
+        resp.on('data', chunk => data += chunk);
+        resp.on('end', () => resolve(data));
+      });
+      req2.on('error', reject);
+      req2.write(geminiBody);
+      req2.end();
+    });
+
+    const geminiData = JSON.parse(result);
+    const text = geminiData.candidates[0].content.parts[0].text.trim();
+    // Rimuovi eventuali backtick o markdown
+    const clean = text.replace(/```json|```/g, '').trim();
+    const data = JSON.parse(clean);
     res.json(data);
 
   } catch (err) {
