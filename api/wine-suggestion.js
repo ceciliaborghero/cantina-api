@@ -1,15 +1,40 @@
-// Wine suggestion API
+const Anthropic = require('@anthropic-ai/sdk');
 
-const wines = [
-    { id: 1, name: 'Chardonnay', type: 'White', description: 'A crisp and fruity white wine.' },
-    { id: 2, name: 'Cabernet Sauvignon', type: 'Red', description: 'A full-bodied red wine.' },
-    { id: 3, name: 'Pinot Noir', type: 'Red', description: 'A light and aromatic red wine.' },
-    { id: 4, name: 'Sauvignon Blanc', type: 'White', description: 'A zesty and refreshing white wine.' }
-];
+const client = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
 
-function suggestWine(type) {
-    const suggestions = wines.filter(wine => wine.type === type);
-    return suggestions.length > 0 ? suggestions : 'No suggestions available for this type.';
-}
+module.exports = async (req, res) => {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
 
-module.exports = { suggestWine };
+  try {
+    const { cellar = [], favorites = [], topCategory = 'Rosso', totalCount = 0 } = req.body;
+
+    const prompt = `Sei un sommelier esperto. Un utente ha una cantina con ${totalCount} vini.
+
+I suoi vini preferiti (max 6):
+${favorites.map(w => `- ${w.name} (${w.category}, voto: ${w.rating}/5)`).join('\n') || 'Nessuno ancora'}
+
+I vini meglio valutati in cantina (max 12):
+${cellar.map(w => `- ${w.name} (${w.category}, voto: ${w.rating}/5)`).join('\n') || 'Nessuno ancora'}
+
+Categoria preferita: ${topCategory}
+
+Suggerisci UN vino reale che potrebbe piacergli, diverso da quelli già in cantina.
+Rispondi SOLO con un JSON valido, senza markdown, senza backtick, esattamente così:
+{
+  "name": "nome del vino",
+  "producer": "nome del produttore",
+  "region": "regione e paese",
+  "year": "annata consigliata (es. 2020)",
+  "description": "una frase breve e poetica sul vino (max 12 parole)",
+  "where": "dove trovarlo (es. Enoteca, Amazon, Vivino)",
+  "reason": "perché lo consiglio (max 6 parole)"
+}`;
+
+    const message = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 300,
+      messages: [{ role: 'user', content: prompt }],
