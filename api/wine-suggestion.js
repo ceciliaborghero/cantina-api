@@ -5,12 +5,19 @@ const client = new Anthropic({
 });
 
 module.exports = async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const { cellar = [], favorites = [], topCategory = 'Rosso', totalCount = 0 } = req.body;
+    let parsed = req.body;
+    if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+    const { cellar = [], favorites = [], topCategory = 'Rosso', totalCount = 0 } = parsed || {};
 
     const prompt = `Sei un sommelier esperto. Un utente ha una cantina con ${totalCount} vini.
 
@@ -22,8 +29,8 @@ ${cellar.map(w => `- ${w.name} (${w.category}, voto: ${w.rating}/5)`).join('\n')
 
 Categoria preferita: ${topCategory}
 
-Suggerisci UN vino reale che potrebbe piacergli, diverso da quelli già in cantina.
-Rispondi SOLO con un JSON valido, senza markdown, senza backtick, esattamente così:
+Suggerisci UN vino reale che potrebbe piacergli, diverso da quelli gia in cantina.
+Rispondi SOLO con un JSON valido, senza markdown, senza backtick, esattamente cosi:
 {
   "name": "nome del vino",
   "producer": "nome del produttore",
@@ -31,7 +38,7 @@ Rispondi SOLO con un JSON valido, senza markdown, senza backtick, esattamente co
   "year": "annata consigliata (es. 2020)",
   "description": "una frase breve e poetica sul vino (max 12 parole)",
   "where": "dove trovarlo (es. Enoteca, Amazon, Vivino)",
-  "reason": "perché lo consiglio (max 6 parole)"
+  "reason": "perche lo consiglio (max 6 parole)"
 }`;
 
     const message = await client.messages.create({
@@ -46,6 +53,6 @@ Rispondi SOLO con un JSON valido, senza markdown, senza backtick, esattamente co
 
   } catch (err) {
     console.error('Errore:', err.message);
-    res.status(500).json({ error: 'Errore nella generazione del suggerimento' });
+    res.status(500).json({ error: err.message });
   }
 };
