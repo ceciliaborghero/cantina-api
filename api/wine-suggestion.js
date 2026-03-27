@@ -40,10 +40,10 @@ Rispondi SOLO con un JSON valido, senza markdown, senza backtick, esattamente co
     const apiKey = process.env.GEMINI_API_KEY;
     const geminiBody = JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: 300, temperature: 0.7 }
+      generationConfig: { maxOutputTokens: 400, temperature: 0.7 }
     });
 
-    const result = await new Promise((resolve, reject) => {
+    const rawResult = await new Promise((resolve, reject) => {
       const options = {
         hostname: 'generativelanguage.googleapis.com',
         path: `/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
@@ -64,7 +64,19 @@ Rispondi SOLO con un JSON valido, senza markdown, senza backtick, esattamente co
       req2.end();
     });
 
-    const geminiData = JSON.parse(result);
+    console.log('Gemini raw response:', rawResult);
+
+    const geminiData = JSON.parse(rawResult);
+
+    // Controlla errori Gemini
+    if (geminiData.error) {
+      return res.status(500).json({ error: geminiData.error.message });
+    }
+
+    if (!geminiData.candidates || geminiData.candidates.length === 0) {
+      return res.status(500).json({ error: 'Nessun risultato da Gemini', raw: rawResult });
+    }
+
     const text = geminiData.candidates[0].content.parts[0].text.trim();
     // Rimuovi eventuali backtick o markdown
     const clean = text.replace(/```json|```/g, '').trim();
