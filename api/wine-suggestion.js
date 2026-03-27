@@ -38,3 +38,14 @@ Rispondi SOLO con un JSON valido, senza markdown, senza backtick, esattamente co
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 300,
       messages: [{ role: 'user', content: prompt }],
+    });
+
+    const text = message.content[0].text.trim();
+    const data = JSON.parse(text);
+    res.json(data);
+
+  } catch (err) {
+    console.error('Errore:', err.message);
+    res.status(500).json({ error: 'Errore nella generazione del suggerimento' });
+  }
+};
