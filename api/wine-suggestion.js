@@ -37,20 +37,23 @@ Rispondi SOLO con un JSON valido, senza markdown, senza backtick, esattamente co
   "reason": "perche lo consiglio (max 6 parole)"
 }`;
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    const geminiBody = JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: 400, temperature: 0.7 }
+    const apiKey = process.env.GROQ_API_KEY;
+    const groqBody = JSON.stringify({
+      model: 'llama-3.1-8b-instant',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 400,
+      temperature: 0.7
     });
 
     const rawResult = await new Promise((resolve, reject) => {
       const options = {
-        hostname: 'generativelanguage.googleapis.com',
-        path: `/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`,
+        hostname: 'api.groq.com',
+        path: '/openai/v1/chat/completions',
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(geminiBody)
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Length': Buffer.byteLength(groqBody)
         }
       };
 
@@ -60,25 +63,18 @@ Rispondi SOLO con un JSON valido, senza markdown, senza backtick, esattamente co
         resp.on('end', () => resolve(data));
       });
       req2.on('error', reject);
-      req2.write(geminiBody);
+      req2.write(groqBody);
       req2.end();
     });
 
-    console.log('Gemini raw response:', rawResult);
+    console.log('Groq raw response:', rawResult);
+    const groqData = JSON.parse(rawResult);
 
-    const geminiData = JSON.parse(rawResult);
-
-    // Controlla errori Gemini
-    if (geminiData.error) {
-      return res.status(500).json({ error: geminiData.error.message });
+    if (groqData.error) {
+      return res.status(500).json({ error: groqData.error.message });
     }
 
-    if (!geminiData.candidates || geminiData.candidates.length === 0) {
-      return res.status(500).json({ error: 'Nessun risultato da Gemini', raw: rawResult });
-    }
-
-    const text = geminiData.candidates[0].content.parts[0].text.trim();
-    // Rimuovi eventuali backtick o markdown
+    const text = groqData.choices[0].message.content.trim();
     const clean = text.replace(/```json|```/g, '').trim();
     const data = JSON.parse(clean);
     res.json(data);
